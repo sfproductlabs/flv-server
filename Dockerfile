@@ -20,6 +20,7 @@ RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
   unzip \
   jq \
   ca-certificates \
+  ffmpeg \
   valgrind \
   && apt autoclean -y \
   && apt autoremove -y \
@@ -52,8 +53,9 @@ RUN wget https://github.com/sfproductlabs/nginx-rtmp-module/archive/dev.zip
 RUN tar -zxvf nginx-1.18.0.tar.gz
 RUN unzip dev.zip
 RUN bash -c 'cd nginx-1.18.0; ./configure --with-http_ssl_module --add-module=../nginx-rtmp-module-dev && make && make install; cd ..;'
+RUN mkdir /tmp/hls && mkdir /tmp/dash
 
-RUN echo "rtmp { \
+RUN echo 'rtmp { \
         server { \
                 listen 1935; \
                 chunk_size 4096; \
@@ -61,8 +63,25 @@ RUN echo "rtmp { \
                         live on; \
                         record off; \
                 } \
+                #application hls { \
+                #        live on; \
+                #        hls on; \
+                #        hls_path /tmp/hls; \
+                #} \
+                #application dash { \
+                #        live on; \
+                #        dash on; \
+                #        dash_path /tmp/dash; \
+                #} \
+                #application big { \
+                #        live on; \
+                #        exec ffmpeg -re -i rtmp://localhost:1935/$app/$name -vcodec flv -acodec copy -s 32x32 -f flv rtmp://localhost:1935/small/${name}; \
+                #} \
+                #application small { \
+                #        live on; \
+                #} \
         } \
-    }" >> /usr/local/nginx/conf/nginx.conf 
+    }' >> /usr/local/nginx/conf/nginx.conf 
 
 ####################################################################################
 
