@@ -67,4 +67,5 @@ RUN echo "rtmp { \
 ####################################################################################
 
 
-CMD /usr/local/nginx/sbin/nginx 
+CMD ["/usr/local/nginx/sbin/nginx", "-g", "daemon off;"]
+
