@@ -1,7 +1,7 @@
-# RTMP Server
+# FLV Server
 Run it from dockerhub:
 ```
-sudo docker run -it -p 1935:1935 sfproductlabs/rtmp-server
+sudo docker run -it -p 1935:1935 sfproductlabs/flv-server
 ```
 Or build it using ```#build.sh```
 

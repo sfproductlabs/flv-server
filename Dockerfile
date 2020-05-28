@@ -1,6 +1,6 @@
 
 ####################################################################################
-# rtmp
+# flv
 ####################################################################################
 
 FROM debian:latest
@@ -49,42 +49,140 @@ RUN bash -c 'echo "net.core.somaxconn = 8192" >> /etc/sysctl.conf' \
 ####################################################################################
 WORKDIR /app/rtmp-server
 RUN wget https://nginx.org/download/nginx-1.18.0.tar.gz
-RUN wget https://github.com/sfproductlabs/nginx-rtmp-module/archive/dev.zip
+RUN wget https://github.com/sfproductlabs/nginx-http-flv-module/archive/master.zip
 RUN tar -zxvf nginx-1.18.0.tar.gz
-RUN unzip dev.zip
-RUN bash -c 'cd nginx-1.18.0; ./configure --with-http_ssl_module --add-module=../nginx-rtmp-module-dev && make && make install; cd ..;'
+RUN unzip master.zip
+RUN bash -c 'cd nginx-1.18.0; ./configure --with-http_ssl_module --add-module=../nginx-http-flv-module-master && make && make install; cd ..;'
 RUN mkdir /tmp/hls && mkdir /tmp/dash
 
-RUN echo 'rtmp { \
-        server { \
-                listen 1935; \
-                chunk_size 4096; \
-                application live { \
-                        live on; \
-                        record off; \
-                } \
-                #application hls { \
-                #        live on; \
-                #        hls on; \
-                #        hls_path /tmp/hls; \
-                #} \
-                #application dash { \
-                #        live on; \
-                #        dash on; \
-                #        dash_path /tmp/dash; \
-                #} \
-                #application big { \
-                #        live on; \
-                #        exec ffmpeg -re -i rtmp://localhost:1935/$app/$name -vcodec flv -acodec copy -s 32x32 -f flv rtmp://localhost:1935/small/${name}; \
-                #} \
-                #application small { \
-                #        live on; \
-                #} \
+RUN echo " \
+worker_processes  1; #should be 1 for Windows, for it doesn't support Unix domain socket \
+#worker_processes  auto; #from versions 1.3.8 and 1.2.5 \
+ \
+#worker_cpu_affinity  0001 0010 0100 1000; #only available on FreeBSD and Linux \
+#worker_cpu_affinity  auto; #from version 1.9.10 \
+ \
+error_log logs/error.log error; \
+ \
+#if the module is compiled as a dynamic module and features relevant \
+#to RTMP are needed, the command below MUST be specified and MUST be \
+#located before events directive, otherwise the module won't be loaded \
+#or will be loaded unsuccessfully when NGINX is started \
+ \
+#load_module modules/ngx_http_flv_live_module.so; \
+ \
+events { \
+    worker_connections  4096; \
+} \
+ \
+http { \
+    include       mime.types; \
+    default_type  application/octet-stream; \
+ \
+    keepalive_timeout  65; \
+ \
+    server { \
+        listen       80; \
+ \
+        location / { \
+            root   /var/www; \
+            index  index.html index.htm; \
         } \
-    }' >> /usr/local/nginx/conf/nginx.conf 
+ \
+        error_page   500 502 503 504  /50x.html; \
+        location = /50x.html { \
+            root   html; \
+        } \
+ \
+        location /live { \
+            flv_live on; #open flv live streaming (subscribe) \
+            chunked_transfer_encoding  on; #open 'Transfer-Encoding: chunked' response \
+ \
+            add_header 'Access-Control-Allow-Origin' '*'; #add additional HTTP header \
+            add_header 'Access-Control-Allow-Credentials' 'true'; #add additional HTTP header \
+        } \
+ \
+        location /hls { \
+            types { \
+                application/vnd.apple.mpegurl m3u8; \
+                video/mp2t ts; \
+            } \
+ \
+            root /tmp; \
+            add_header 'Cache-Control' 'no-cache'; \
+        } \
+ \
+        location /dash { \
+            root /tmp; \
+            add_header 'Cache-Control' 'no-cache'; \
+        } \
+ \
+        location /stat { \
+            #configuration of push & pull status \
+ \
+            rtmp_stat all; \
+            rtmp_stat_stylesheet stat.xsl; \
+        } \
+ \
+        location /stat.xsl { \
+            root /var/www/rtmp; #specify in where stat.xsl located \
+        } \
+ \
+        #if JSON style stat needed, no need to specify \
+        #stat.xsl but a new directive rtmp_stat_format \
+ \
+        #location /stat { \
+        #    rtmp_stat all; \
+        #    rtmp_stat_format json; \
+        #} \
+ \
+        location /control { \
+            rtmp_control all; #configuration of control module of rtmp \
+        } \
+    } \
+} \
+ \
+rtmp_auto_push on; \
+rtmp_auto_push_reconnect 1s; \
+rtmp_socket_dir /tmp; \
+ \
+rtmp { \
+    out_queue           4096; \
+    out_cork            8; \
+    max_streams         128; \
+    timeout             15s; \
+    drop_idle_publisher 15s; \
+ \
+    log_interval 5s; #interval used by log module to log in access.log, it is very useful for debug \
+    log_size     1m; #buffer size used by log module to log in access.log \
+ \
+    server { \
+        listen 1935; \
+        chunk_size 4096; \
+        #server_name www.test.*; #for suffix wildcard matching of virtual host name \
+ \
+        application live { \
+            live on; \
+            gop_cache on; #open GOP cache for reducing the wating time for the first picture of video \
+        } \
+ \
+        application hls { \
+            live on; \
+            hls on; \
+            hls_path /tmp/hls; \
+        } \
+ \
+        application dash { \
+            live on; \
+            dash on; \
+            dash_path /tmp/dash; \
+        } \
+    } \
+ \
+} \
+" >> /usr/local/nginx/conf/nginx.conf 
 
 ####################################################################################
 
 
 CMD ["/usr/local/nginx/sbin/nginx", "-g", "daemon off;"]
-

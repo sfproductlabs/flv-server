@@ -1,3 +1,3 @@
 #!/bin/bash
 
-sudo docker build -t rtmp-server .
+sudo docker build -t flv-server .
