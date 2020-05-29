@@ -1,9 +1,15 @@
 # FLV Server
 Run it from dockerhub:
 ```
-sudo docker run -it -p 1935:1935 sfproductlabs/flv-server
+sudo docker run -it -p 1935:1935 -p 80:80 sfproductlabs/flv-server
 ```
 Or build it using ```#build.sh```
+
+Then go to:
+```
+http://yourservername.com/live?app=live&stream=streamname
+```
+try here (http://www.nodemedia.cn/uploads/nodeplayer.html)
 
 ## Install dependencies
 ### Docker (debian)
