@@ -5,6 +5,11 @@ sudo docker run -it -p 1935:1935 -p 80:80 sfproductlabs/flv-server
 ```
 Or build it using ```#build.sh```
 
+Pubilsh your rtmp stream to (Ex. using obs-studio https://github.com/dioptre/obs-studio/):
+```
+rtmp://yourinternalservice/live/streamname
+```
+
 Then go to:
 ```
 http://yourservername.com/live?app=live&stream=streamname
